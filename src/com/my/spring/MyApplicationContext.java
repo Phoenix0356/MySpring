@@ -28,12 +28,11 @@ public class MyApplicationContext {
             File[] files = file.listFiles();
             if (files == null) return;
             try {
-
                 for (File f : files) {
                     String className = getClassName(f);
                     createBean(className);
                 }
-            } catch (URISyntaxException e) {
+            } catch (URISyntaxException | ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }
         }
@@ -59,14 +58,10 @@ public class MyApplicationContext {
         }
         return className;
     }
-    public void createBean(String className){
+    public void createBean(String className) throws ClassNotFoundException {
         if (className == null) return;
         Class<?> clazz;
-        try {
-            clazz = classLoader.loadClass(className);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+        clazz = classLoader.loadClass(className);
         if (clazz.isAnnotationPresent(Component.class)) {
             //bean
         }
@@ -74,7 +69,6 @@ public class MyApplicationContext {
 
 
     public Object getBean(Class<?> beanClass){
-
         return null;
     }
 }
