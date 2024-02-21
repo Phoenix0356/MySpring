@@ -2,15 +2,19 @@ package com.my.spring;
 
 import com.my.spring.Annotations.Component;
 import com.my.spring.Annotations.ComponentScan;
+import com.my.spring.Annotations.Scope;
 
 import java.io.File;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MyApplicationContext {
     private final Class<?> configClass;
     private final ClassLoader classLoader;
+
+    private ConcurrentHashMap<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>();
 
     public MyApplicationContext(Class<?> configClass){
         this.configClass = configClass;
@@ -59,11 +63,26 @@ public class MyApplicationContext {
         return className;
     }
     public void createBean(String className) throws ClassNotFoundException {
+        System.out.println(className);
         if (className == null) return;
         Class<?> clazz;
         clazz = classLoader.loadClass(className);
         if (clazz.isAnnotationPresent(Component.class)) {
-            //bean
+
+//            Component component = clazz.getAnnotation(Component.class);
+//            String beanName = component.value();
+
+            //BeanDefinition
+            BeanDefinition beanDefinition = new BeanDefinition();
+            beanDefinition.setType(clazz);
+            if (clazz.isAnnotationPresent(Scope.class)){
+                Scope scopeAnnotation = clazz.getAnnotation(Scope.class);
+                beanDefinition.setScope(scopeAnnotation.value());
+            }else {
+                beanDefinition.setScope("singleton");
+            }
+            this.beanDefinitionMap.put(className,beanDefinition);
+
         }
     }
 
