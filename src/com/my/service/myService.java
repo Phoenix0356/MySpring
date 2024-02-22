@@ -5,6 +5,6 @@ import com.my.spring.Annotations.Component;
 import com.my.spring.Annotations.Scope;
 
 @Component("myService")
-@Scope("prototype")
+@Scope("singleton")
 public class myService {
 }

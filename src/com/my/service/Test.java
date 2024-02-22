@@ -5,6 +5,12 @@ import com.my.spring.MyApplicationContext;
 public class Test {
     public static void main(String[] args) {
         MyApplicationContext myApplicationContext = new MyApplicationContext(AppConfig.class);
-        Object myService = myApplicationContext.getBean(myService.class);
+        Object myService = myApplicationContext.getBean("myService");
+
+        System.out.println(myApplicationContext.getBean("myService"));
+        System.out.println(myApplicationContext.getBean("myService"));
+        System.out.println(myApplicationContext.getBean("myService"));
+        System.out.println(myApplicationContext.getBean("myService"));
+        System.out.println(myApplicationContext.getBean("myService"));
     }
 }
