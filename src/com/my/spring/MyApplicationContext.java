@@ -1,10 +1,14 @@
 package com.my.spring;
 
+import com.my.spring.Annotations.Autowired;
 import com.my.spring.Annotations.Component;
 import com.my.spring.Annotations.ComponentScan;
 import com.my.spring.Annotations.Scope;
+import com.my.spring.Interfaces.BeanNameAware;
 
+import java.beans.Introspector;
 import java.io.File;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -83,6 +87,10 @@ public class MyApplicationContext {
             Component component = clazz.getAnnotation(Component.class);
             String beanName = component.value();
 
+            if (beanName.isEmpty()){
+                beanName = Introspector.decapitalize(clazz.getSimpleName());
+            }
+
             //BeanDefinition
             BeanDefinition beanDefinition = new BeanDefinition();
             beanDefinition.setType(clazz);
@@ -102,6 +110,23 @@ public class MyApplicationContext {
         Object instance;
         try {
             instance = clazz.getConstructor().newInstance();
+
+            //dependence injection
+            for (Field field : clazz.getDeclaredFields()) {
+                if (field.isAnnotationPresent(Autowired.class)){
+                    field.setAccessible(true);
+                    field.set(instance,getBean(field.getName()));
+                }
+            }
+
+            //Aware callback
+            if (instance instanceof BeanNameAware){
+                ((BeanNameAware) instance).setBeanName(beanName);
+            }
+
+            //initialize
+
+
         } catch (InvocationTargetException | InstantiationException |
                  IllegalAccessException | NoSuchMethodException e) {
             throw new RuntimeException(e);
