@@ -8,9 +8,9 @@ public class Test {
         MyService myService = (MyService) myApplicationContext.getBean("myService");
         myService.test();
         myService.afterPropertiesSet();
-        System.out.println(myApplicationContext.getBean("myService"));
-        System.out.println(myApplicationContext.getBean("myService"));
-        System.out.println(myApplicationContext.getBean("myService"));
+//        System.out.println(myApplicationContext.getBean("myService"));
+//        System.out.println(myApplicationContext.getBean("myService"));
+//        System.out.println(myApplicationContext.getBean("myService"));
 
     }
 }
