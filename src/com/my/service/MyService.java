@@ -9,7 +9,7 @@ import com.my.spring.Interfaces.InitializeBean;
 
 @Component
 @Scope("prototype")
-public class MyService implements BeanNameAware, InitializeBean {
+public class MyService implements BeanNameAware, InitializeBean, MyServiceInterface {
     @Autowired
     DiService diService;
 
@@ -24,6 +24,7 @@ public class MyService implements BeanNameAware, InitializeBean {
     public void afterPropertiesSet() {
         System.out.println(beanName+" initialized");
     }
+    @Override
     public void test(){
         System.out.println(diService);
     }

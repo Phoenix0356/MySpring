@@ -139,7 +139,7 @@ public class MyApplicationContext {
 
             //before init operation
             for (BeanPostProcessor beanPostProcessor : BeanPostProcessorList) {
-                beanPostProcessor.postProcessorBeforeInitialization(beanName,instance);
+                instance = beanPostProcessor.postProcessorBeforeInitialization(beanName,instance);
             }
 
             //initialize
@@ -149,7 +149,7 @@ public class MyApplicationContext {
 
             //after init operation
             for (BeanPostProcessor beanPostProcessor : BeanPostProcessorList) {
-                beanPostProcessor.postProcessorAfterInitialization(beanName,instance);
+                instance = beanPostProcessor.postProcessorAfterInitialization(beanName,instance);
             }
 
 
