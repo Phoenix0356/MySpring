@@ -1,7 +1,7 @@
 package com.my.service;
 
-import com.my.spring.Annotations.Component;
-import com.my.spring.Interfaces.BeanPostProcessor;
+import com.my.spring.annotations.Component;
+import com.my.spring.postprocessor.BeanPostProcessor;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -16,7 +16,7 @@ public class MyBeanPostProcessor implements BeanPostProcessor {
 
     @Override
     public Object postProcessorAfterInitialization(String beanName, Object bean) {
-        if (beanName.equals("myService")){
+        if (beanName.equals("")){
             Object proxyInstance = Proxy.newProxyInstance(MyBeanPostProcessor.class.getClassLoader(), bean.getClass().getInterfaces(), new InvocationHandler() {
                 @Override
                 public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {

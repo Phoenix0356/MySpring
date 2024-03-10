@@ -1,7 +1,7 @@
 package com.my.service;
 
-import com.my.spring.Annotations.ComponentScan;
+import com.my.spring.annotations.ComponentScan;
 
-@ComponentScan("com.my.service")
+@ComponentScan(value = "com.my.service",beanNameGenerator = MyBeanNameGenerator.class)
 public class AppConfig {
 }

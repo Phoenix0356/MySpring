@@ -1,4 +1,4 @@
-package com.my.spring.Interfaces;
+package com.my.spring.initializer;
 
 public interface InitializeBean {
     public void afterPropertiesSet();

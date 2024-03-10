@@ -1,77 +1,119 @@
 package com.my.spring;
 
-import com.my.spring.Annotations.Autowired;
-import com.my.spring.Annotations.Component;
-import com.my.spring.Annotations.ComponentScan;
-import com.my.spring.Annotations.Scope;
-import com.my.spring.Interfaces.BeanNameAware;
-import com.my.spring.Interfaces.BeanPostProcessor;
-import com.my.spring.Interfaces.InitializeBean;
+import com.my.spring.annotations.Autowired;
+import com.my.spring.annotations.Component;
+import com.my.spring.annotations.ComponentScan;
+import com.my.spring.annotations.Scope;
+import com.my.spring.awares.BeanNameAware;
+import com.my.spring.postprocessor.BeanPostProcessor;
+import com.my.spring.initializer.InitializeBean;
+import com.my.spring.scanner.BeanNameGenerator;
+import com.my.spring.scanner.DefaultBeanNameGenerator;
+import com.my.spring.scanner.Scanner;
+import com.my.spring.util.BeanUtil;
 
-import java.beans.Introspector;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MyApplicationContext {
     private final Class<?> configClass;
     private final ClassLoader classLoader;
 
+    private final Scanner scanner;
 
-    private ConcurrentHashMap<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<String, Object> singletonObjectsPool = new ConcurrentHashMap<>();
+    private BeanNameGenerator beanNameGenerator;
 
-    private List<BeanPostProcessor> BeanPostProcessorList = new ArrayList<>();
+    private final ConcurrentHashMap<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>();
+    //单例池
+    private final ConcurrentHashMap<String, Object> singletonObjects = new ConcurrentHashMap<>();
+    private final List<BeanPostProcessor> BeanPostProcessorList = new ArrayList<>();
+    public final HashSet<String> creatingBeanSet = new HashSet<>();
+    //二级缓存
+    public final ConcurrentHashMap<String,Object> earlySingletonBeans = new ConcurrentHashMap<>();
+
 
     public MyApplicationContext(Class<?> configClass){
         this.configClass = configClass;
+        this.scanner = new Scanner();
         this.classLoader = MyApplicationContext.class.getClassLoader();
+        
 
         if (configClass.isAnnotationPresent(ComponentScan.class)) {
+
+            ComponentScan componentScanAnnotation = configClass.getAnnotation(ComponentScan.class);
+
+            generateBeanNameGenerator(componentScanAnnotation);
+
             //scan
-            scan();
+            scan(componentScanAnnotation);
 
             //create singleton
             for (String beanName : beanDefinitionMap.keySet()) {
                 BeanDefinition beanDefinition = beanDefinitionMap.get(beanName);
                 if (beanDefinition.getScope().equals("singleton")){
-                    Object bean = createBean(beanName,beanDefinition);
-                    singletonObjectsPool.put(beanName,bean);
+                    if (singletonObjects.get(beanName) == null) {
+                        Object bean = createBean(beanName, beanDefinition);
+                        singletonObjects.put(beanName, bean);
+                    }
                 }
             }
         }
     }
-    private void scan(){
-        File file = new File(getBeansAbsolutelyPath());
-        if (file.isDirectory()){
-            File[] files = file.listFiles();
-            if (files == null) System.out.println("No Beans Found!!!");;
-            try {
-                for (File f : files) {
-                    String className = getClassName(f);
-                    createBeanDefinition(className);
-                }
-            } catch (URISyntaxException | ClassNotFoundException | InstantiationException | IllegalAccessException |
-                     InvocationTargetException | NoSuchMethodException e) {
-                throw new RuntimeException(e);
+
+    private void generateBeanNameGenerator(ComponentScan componentScan){
+        Class<? extends BeanNameGenerator> generatorClass = componentScan.beanNameGenerator();
+        boolean useDefaultNameGenerator = BeanNameGenerator.class == generatorClass;
+        this.beanNameGenerator = (BeanNameGenerator) (useDefaultNameGenerator?
+                        BeanUtil.instantiateBean(DefaultBeanNameGenerator.class):
+                        BeanUtil.instantiateBean(generatorClass));
+    }
+
+    private void scan(ComponentScan componentScanAnnotation){
+        String path = componentScanAnnotation.value().replace(".","/");
+        String beansAbsolutePath = Objects.requireNonNull(classLoader.getResource(path)).getFile();
+
+        List<File> files = obtainAllFiles(beansAbsolutePath);
+        try {
+            for (File f : files) {
+                String className = obtainClassName(f);
+                createBeanDefinition(className);
             }
+        } catch (URISyntaxException | ClassNotFoundException | InstantiationException | IllegalAccessException |
+                 InvocationTargetException | NoSuchMethodException e) {
+            throw new RuntimeException(e);
         }
     }
-    //scan
-    private String getBeansAbsolutelyPath(){
-        ComponentScan componentScanAnnotation = configClass.getAnnotation(ComponentScan.class);
-        String path = componentScanAnnotation.value();
-        path = path.replace(".","/");
-        return Objects.requireNonNull(classLoader.getResource(path)).getFile();
+
+
+    //bfs获取所有文件
+    private List<File> obtainAllFiles(String beansAbsolutePath){
+        List<File> classFileList = new ArrayList<>();
+        File entranceFileObject = new File(beansAbsolutePath);
+
+        Queue<File> fileQueue = new ArrayDeque<>();
+        fileQueue.offer(entranceFileObject);
+
+        while (!fileQueue.isEmpty()){
+            File curFileObject = fileQueue.poll();
+            if (curFileObject.isFile()) classFileList.add(curFileObject);
+            else {
+                File[] childFileList = curFileObject.listFiles();
+                if (childFileList != null) {
+                    for (File file : childFileList) {
+                        fileQueue.offer(file);
+                    }
+                }
+            }
+        }
+        return classFileList;
     }
-    //scan
-    private String getClassName(File file) throws URISyntaxException {
+
+    private String obtainClassName(File file) throws URISyntaxException {
         String absolutePath = file.getAbsolutePath();
         String className = null;
         if (absolutePath.endsWith(".class")) {
@@ -98,12 +140,7 @@ public class MyApplicationContext {
                 this.BeanPostProcessorList.add(beanPostProcessor);
             }
 
-            Component component = clazz.getAnnotation(Component.class);
-            String beanName = component.value();
-
-            if (beanName.isEmpty()){
-                beanName = Introspector.decapitalize(clazz.getSimpleName());
-            }
+            String beanName = beanNameGenerator.generateBeanName(clazz);
 
             //BeanDefinition
             BeanDefinition beanDefinition = new BeanDefinition();
@@ -119,44 +156,59 @@ public class MyApplicationContext {
     }
 
     private Object createBean(String beanName,BeanDefinition beanDefinition){
-        Class clazz = beanDefinition.getType();
+        Class<?> clazz = beanDefinition.getType();
+        beanName = this.beanNameGenerator.generateBeanName(clazz);
         Object instance;
         try {
-            instance = clazz.getConstructor().newInstance();
+            if (creatingBeanSet.contains(beanName)){
+                instance = earlySingletonBeans.get(beanName);
 
-            //dependence injection
-            for (Field field : clazz.getDeclaredFields()) {
-                if (field.isAnnotationPresent(Autowired.class)){
-                    field.setAccessible(true);
-                    field.set(instance,getBean(field.getName()));
+            }else {
+                instance = clazz.getDeclaredConstructor().newInstance();
+
+                creatingBeanSet.add(beanName);
+                earlySingletonBeans.put(beanName,instance);
+
+                for (Field field : clazz.getDeclaredFields()) {
+                    if (field.isAnnotationPresent(Autowired.class)) {
+                        field.setAccessible(true);
+                        Class<?> fieldBeanClass = field.getType();
+
+                        String fieldBeanName = this.beanNameGenerator.generateBeanName(fieldBeanClass);
+
+                        field.set(instance, getBean(fieldBeanName));
+                    }
+                }
+
+                //Aware callback
+                if (instance instanceof BeanNameAware) {
+                    ((BeanNameAware) instance).setBeanName(beanName);
+                }
+
+                //before init operation
+                for (BeanPostProcessor beanPostProcessor : BeanPostProcessorList) {
+                    instance = beanPostProcessor.postProcessorBeforeInitialization(beanName, instance);
+                }
+
+                //initialize
+                if (instance instanceof InitializeBean) {
+                    ((InitializeBean) instance).afterPropertiesSet();
+                }
+
+                //after init operation
+                for (BeanPostProcessor beanPostProcessor : BeanPostProcessorList) {
+                    instance = beanPostProcessor.postProcessorAfterInitialization(beanName, instance);
                 }
             }
 
-            //Aware callback
-            if (instance instanceof BeanNameAware){
-                ((BeanNameAware) instance).setBeanName(beanName);
-            }
-
-            //before init operation
-            for (BeanPostProcessor beanPostProcessor : BeanPostProcessorList) {
-                instance = beanPostProcessor.postProcessorBeforeInitialization(beanName,instance);
-            }
-
-            //initialize
-            if (instance instanceof InitializeBean){
-                ((InitializeBean) instance).afterPropertiesSet();
-            }
-
-            //after init operation
-            for (BeanPostProcessor beanPostProcessor : BeanPostProcessorList) {
-                instance = beanPostProcessor.postProcessorAfterInitialization(beanName,instance);
-            }
-
-
         } catch (InvocationTargetException | InstantiationException |
-                 IllegalAccessException | NoSuchMethodException e) {
-            throw new RuntimeException(e);
+                 IllegalAccessException | NoSuchMethodException e){
+                throw new RuntimeException(e);
         }
+
+        creatingBeanSet.remove(beanName);
+        earlySingletonBeans.remove(beanName);
+
         return instance;
     }
 
@@ -168,10 +220,10 @@ public class MyApplicationContext {
            String scope = beanDefinition.getScope();
            if (scope.equals("singleton")){
                //get from singleton pool
-               Object bean = singletonObjectsPool.get(beanName);
+               Object bean = singletonObjects.get(beanName);
                if (bean == null){
                    Object newBean = createBean(beanName,beanDefinition);
-                   singletonObjectsPool.put(beanName,beanDefinition);
+                   singletonObjects.put(beanName,newBean);
                    return newBean;
                }
                return bean;

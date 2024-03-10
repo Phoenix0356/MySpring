@@ -1,4 +1,4 @@
-package com.my.spring.Interfaces;
+package com.my.spring.postprocessor;
 
 public interface BeanPostProcessor {
     public Object postProcessorBeforeInitialization(String beanName,Object bean);
